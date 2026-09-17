@@ -8,7 +8,7 @@ The purpose is to establish clear service ownership before designing the detaile
 
 The service decomposition baseline is:
 
-1. User & Identity Service
+1. User Service
 2. Movie Service
 3. Theatre Service
 4. Show Service
@@ -53,7 +53,7 @@ For example:
 - Show Service manages scheduled show information.
 - Booking Service manages seat inventory for a show and booking lifecycle.
 - Payment Service manages payment state and payment processing.
-- User & Identity Service manages identity and authentication.
+- User Service manages identity and authentication.
 
 ### 2.4 Strong Consistency Where Required
 
@@ -75,7 +75,7 @@ Eureka Server and API Gateway support the business services but do not own core 
 
 | Service | Primary Responsibility | Primary Data Ownership |
 |---|---|---|
-| User & Identity Service | User accounts, authentication, OTP, roles | Users, credentials, OTP records, roles |
+| User Service | User accounts, authentication, OTP, roles | Users, credentials, OTP records, roles |
 | Movie Service | Movie catalogue and metadata | Movies, movie metadata |
 | Theatre Service | Physical cinema infrastructure | Theatres, screens, physical seats, theatre operators |
 | Show Service | Scheduled movie screenings and configuration | Shows, pricing, cancellation policy |
@@ -84,11 +84,11 @@ Eureka Server and API Gateway support the business services but do not own core 
 
 ---
 
-# 4. User & Identity Service
+# 4. User Service
 
 ## 4.1 Responsibility
 
-The User & Identity Service manages the identity and authentication domain of BookNGo.
+The User Service manages the identity and authentication domain of BookNGo.
 
 It provides functionality required to:
 
@@ -574,9 +574,9 @@ Payment status/reconciliation is required for UNKNOWN outcomes so that the syste
 
 10. Cross-Service Ownership Matrix
 Business Concept	Owning Service	Other Services May
-User	User & Identity	Reference user
-Authentication	User & Identity	Validate/use identity
-Role	User & Identity	Enforce authorization
+User	User Service	Reference user
+Authentication	User Service	Validate/use identity
+Role	User Service	Enforce authorization
 Movie	Movie	Reference movie
 Theatre	Theatre	Reference theatre
 Screen	Theatre	Reference screen
@@ -597,7 +597,7 @@ The services use references rather than duplicated ownership.
 
 Conceptually:
 
-User & Identity
+User Service
        |
        | user_id
        v
@@ -753,7 +753,7 @@ Client
 API Gateway
   |
   v
-User & Identity Service
+User Service
 Movie Discovery
 Client
   |
@@ -894,7 +894,7 @@ Theatre Service
 Show Service
     -> show discovery and scheduling operations
 
-User & Identity Service
+User Service
     -> authentication and identity operations
 
 Payment Service
@@ -910,7 +910,7 @@ The architecture should therefore avoid assuming that all services require ident
 The final business boundary is:
 
 +----------------------------+
-| User & Identity Service    |
+| User Service    |
 |----------------------------|
 | Users                      |
 | Authentication             |
@@ -982,7 +982,7 @@ Infrastructure:
 
 BookNGo will use six business microservices:
 
-User & Identity Service
+User Service
 Movie Service
 Theatre Service
 Show Service

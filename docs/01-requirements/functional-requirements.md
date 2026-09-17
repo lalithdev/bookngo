@@ -178,6 +178,13 @@ Authenticated API operations shall require valid authentication credentials.
 
 JWT shall be used for authenticated API access.
 
+FR-20 — Operator and Admin Password Authentication
+
+The system shall support username and password authentication for non-customer roles:
+- CUSTOMER: Phone Number + OTP → JWT
+- THEATRE_OPERATOR: Username + Password → JWT
+- ADMIN: Username + Password → JWT
+
 6. Booking Requirements
 FR-20 — Booking Data
 

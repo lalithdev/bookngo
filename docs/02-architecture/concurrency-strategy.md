@@ -211,13 +211,21 @@ A conditional update can conceptually follow:
 UPDATE show_seat_inventory
 SET
     status = 'HELD',
-    hold_id = :holdId,
+    active_hold_id = :holdId,
     hold_expires_at = :expiry
 WHERE
     show_id = :showId
     AND physical_seat_id = :seatId
-    AND status = 'AVAILABLE';
+    AND (
+        status = 'AVAILABLE'
+        OR (
+            status = 'HELD'
+            AND hold_expires_at < CURRENT_TIMESTAMP
+        )
+    );
 ```
+
+This ensures that expired HELD seats can be reclaimed lazily during acquisition even if a background cleanup job has not yet run.
 
 The application then verifies the number of affected rows.
 
@@ -353,13 +361,17 @@ A1 → A2
 
 ## 10. Hold Creation
 
-A seat hold begins only when:
+The exact logical hold acquisition workflow is:
 
-1. The customer selects seats.
-2. The customer clicks Continue/Proceed to Book.
-3. The server successfully creates the hold.
+```text
+inventory acquisition
+    ↓
+booking(INITIATED)
+    ↓
+seat_hold(ACTIVE)
+```
 
-Selecting seats in the UI does not create a server-side hold.
+This workflow ensures full compatibility with `seat_holds.booking_id NOT NULL`. The `bookings` record is created in the `INITIATED` status during the hold creation transaction.
 
 Once successfully created:
 

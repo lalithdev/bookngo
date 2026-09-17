@@ -486,17 +486,13 @@ A race can still occur between displaying availability and attempting to acquire
 
 BookNGo requires authentication for protected customer and operator operations.
 
-The initial authentication mechanism is:
+The role-specific authentication model is:
 
-Phone Number
-      ↓
-OTP
-      ↓
-OTP Verification
-      ↓
-JWT
+- **CUSTOMER**: Phone Number + OTP → JWT
+- **THEATRE_OPERATOR**: Username + Password → JWT
+- **ADMIN**: Username + Password → JWT
 
-JWT is then used to authenticate subsequent protected API requests.
+All authenticated roles receive a signed JWT to authenticate subsequent protected API requests.
 
 Roles include:
 
@@ -514,7 +510,7 @@ BookNGo is designed as a microservices-based platform.
 
 The current proposed business service boundaries are:
 
-1. User & Identity Service
+1. User Service
 2. Movie Service
 3. Theatre Service
 4. Show Service
@@ -530,9 +526,9 @@ These service boundaries are derived from product capabilities and requirements 
 
 22. Product Capability Ownership
 Capability	Responsible Service
-User accounts	User & Identity
-OTP authentication	User & Identity
-JWT authentication	User & Identity / security layer
+User accounts	User Service
+OTP authentication	User Service
+JWT authentication	User Service / security layer
 Movies	Movie
 Theatres	Theatre
 Screens	Theatre

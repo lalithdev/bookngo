@@ -36,7 +36,7 @@ Payment Service
 
 OTP/SMS Provider
        ↕
-User & Identity Service
+User Service
 
 The frontend is treated as an untrusted client.
 
@@ -44,27 +44,33 @@ All important authorization decisions must happen on the backend.
 
 3. Authentication Model
 
-BookNGo uses:
+BookNGo uses role-specific authentication, all resulting in JWT issuance:
 
-Phone Number + OTP
-        ↓
-User Verification
-        ↓
-JWT
-        ↓
-Authenticated API Requests
+CUSTOMER:
+Phone Number + OTP → JWT
 
-The User & Identity Service owns authentication.
+THEATRE_OPERATOR:
+Username + Password → JWT
 
-The authentication flow is:
+ADMIN:
+Username + Password → JWT
 
+The User Service owns authentication.
+
+The Customer (OTP) authentication flow is:
 1. User submits phone number.
-2. Identity Service generates/sends OTP.
+2. User Service generates/sends (or simulates) OTP.
 3. User submits OTP.
-4. Identity Service validates OTP.
-5. Identity Service authenticates the user.
+4. User Service validates OTP against `otp_verifications`.
+5. User Service authenticates the user.
 6. JWT is issued.
 7. Client sends JWT with protected requests.
+
+The Operator and Admin (Password) authentication flow is:
+1. Operator/Admin submits username (or phone/email) and password.
+2. User Service validates credentials against `users.password_hash`.
+3. JWT is issued.
+4. Client sends JWT with protected requests.
 4. JWT Authentication
 
 JWT is the primary authentication mechanism for protected APIs.
@@ -321,7 +327,7 @@ expires_at
 attempt count
 verification status
 
-The exact persistence model belongs to the User & Identity Service.
+The exact persistence model belongs to the User Service.
 
 19. OTP Rate Limiting
 
@@ -617,7 +623,7 @@ ADMIN
 
 A customer must not gain operator permissions through a request payload.
 
-Role assignment must be controlled by the User & Identity Service and administrative workflows.
+Role assignment must be controlled by the User Service and administrative workflows.
 
 38. Service-Level Security
 
@@ -653,7 +659,7 @@ Example:
 /api/shows/**      → Show Service
 /api/bookings/**   → Booking Service
 /api/payments/**   → Payment Service
-/api/users/**      → User & Identity Service
+/api/users/**      → User Service
 
 Exact route patterns will be finalized in the API contract.
 
@@ -796,7 +802,7 @@ The security model is:
 
 The core security responsibilities are:
 
-User & Identity Service
+User Service
 → Authentication
 → OTP
 → User identity
@@ -827,7 +833,7 @@ Authentication	JWT
 Initial login mechanism	Phone + OTP
 OTP validity	5 minutes
 Roles	CUSTOMER, THEATRE_OPERATOR, ADMIN
-User identity owner	User & Identity Service
+User identity owner	User Service
 JWT secret	Environment/deployment configuration
 Protected APIs	Backend-enforced
 Authorization	Role + resource ownership

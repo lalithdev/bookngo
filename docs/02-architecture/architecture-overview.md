@@ -35,7 +35,7 @@ The architecture is organized around business capabilities rather than technical
 
 The six business microservices are:
 
-1. User & Identity Service
+1. User Service
 2. Movie Service
 3. Theatre Service
 4. Show Service
@@ -80,7 +80,7 @@ The frontend is a separate client application.
                   |                  |       |                  |
                   v                  v       v                  v
         +----------------+  +----------------+  +----------------+
-        | User & Identity|  | Movie Service  |  | Theatre        |
+        | User Service|  | Movie Service  |  | Theatre        |
         |    Service     |  |                |  | Service        |
         +-------+--------+  +-------+--------+  +-------+--------+
                 |                   |                   |
@@ -186,7 +186,7 @@ Frontend
     v
 API Gateway
     |
-    +----> User & Identity Service
+    +----> User Service
     |
     +----> Movie Service
     |
@@ -208,7 +208,7 @@ Each backend service registers itself with Eureka.
 
 Conceptually:
 
-User & Identity Service ----+
+User Service ----+
 Movie Service --------------+
 Theatre Service ------------+
 Show Service ---------------+----> Eureka Server
@@ -222,7 +222,7 @@ Eureka does not process business transactions.
 It owns service registration information rather than BookNGo business entities.
 
 7. Business Services
-7.1 User & Identity Service
+7.1 User Service
 
 Responsible for:
 
@@ -330,7 +330,7 @@ Each business service owns its own database.
 
 The logical arrangement is:
 
-User & Identity Service
+User Service
         |
         v
    User Database
@@ -377,7 +377,7 @@ This preserves service autonomy and ownership.
 
 The primary conceptual relationships are:
 
-User & Identity
+User Service
         |
         | user identity
         v
@@ -780,7 +780,7 @@ will be defined in:
 
 docs/02-architecture/security.md
 
-The User & Identity Service remains responsible for identity and authentication-related operations.
+The User Service remains responsible for identity and authentication-related operations.
 
 21. Theatre Operator Flow
 
@@ -848,7 +848,7 @@ External Payment Provider
 
 and:
 
-User & Identity Service
+User Service
       |
       v
 OTP/SMS Provider
@@ -865,7 +865,7 @@ Frontend
 API Gateway
 Eureka Server
 
-User & Identity Service
+User Service
 Movie Service
 Theatre Service
 Show Service
@@ -910,7 +910,7 @@ Show Service
 Theatre Service
     -> relatively stable infrastructure data
 
-User & Identity Service
+User Service
     -> authentication traffic
 
 Payment Service

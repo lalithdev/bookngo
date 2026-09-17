@@ -29,7 +29,7 @@ Each business microservice owns its own persistent data.
 
 The six business services therefore have six logical databases:
 
-User & Identity Service
+User Service
         |
         v
    User Database
@@ -114,16 +114,16 @@ Booking Service
 Booking Database
 3. Database Ownership Overview
 Service	Database	Primary Data
-User & Identity	User Database	Users, credentials, OTP, roles
+User Service	User Database	Users, credentials, OTP, roles
 Movie	Movie Database	Movies, movie metadata
 Theatre	Theatre Database	Theatres, screens, physical seats, operator assignments
 Show	Show Database	Shows, pricing, cancellation policies
 Booking	Booking Database	Show-seat inventory, holds, bookings, tickets
 Payment	Payment Database	Payment attempts, payment state, refunds/reversals
-4. User & Identity Database
+4. User Service Database
 4.1 Owner
 
-User & Identity Service
+User Service
 
 4.2 Authoritative Data
 
@@ -161,11 +161,11 @@ CUSTOMER
 THEATRE_OPERATOR
 ADMIN
 
-The relationship between users and roles is owned by User & Identity Service.
+The relationship between users and roles is owned by User Service.
 
 4.5 OTP Data
 
-OTP-related state belongs to User & Identity Service.
+OTP-related state belongs to User Service.
 
 Logical information may include:
 
@@ -181,7 +181,7 @@ The OTP lifetime is governed by the requirements.
 
 4.6 Does Not Own
 
-User & Identity Database must not store:
+User Service Database must not store:
 
 Movie records.
 Theatre records.
@@ -822,7 +822,7 @@ A simplified ownership view of the booking process is:
 
 User
  |
- +-- User & Identity Service
+ +-- User Service
 
 Movie
  |
@@ -999,9 +999,9 @@ Idempotency information must be persisted where required for safe retries.
 
 41. Final Data Ownership Matrix
 Entity / Data	Owner Service	Database
-User	User & Identity	User DB
-Role	User & Identity	User DB
-OTP	User & Identity	User DB
+User	User Service	User DB
+Role	User Service	User DB
+OTP	User Service	User DB
 Movie	Movie	Movie DB
 Theatre	Theatre	Theatre DB
 Screen	Theatre	Theatre DB
@@ -1026,7 +1026,7 @@ Payment Idempotency	Payment	Payment DB
 The final logical database architecture is:
 
                          +----------------------+
-                         | User & Identity      |
+                         | User Service      |
                          | Service              |
                          +----------+-----------+
                                     |
@@ -1137,7 +1137,7 @@ This distinction is fundamental to the high-concurrency booking architecture.
 
 The approved data ownership architecture is:
 
-User & Identity -> User DB
+User Service -> User DB
 Movie           -> Movie DB
 Theatre         -> Theatre DB
 Show            -> Show DB

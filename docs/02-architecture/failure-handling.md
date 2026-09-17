@@ -524,7 +524,7 @@ Expired OTP
 Too many attempts
 Provider unavailable
 
-The User & Identity Service must enforce OTP validity and attempt limits.
+The User Service must enforce OTP validity and attempt limits.
 
 The failure must not create an authenticated session.
 

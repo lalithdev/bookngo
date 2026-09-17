@@ -122,7 +122,7 @@ The following BookNGo capabilities were evaluated during decomposition:
 | Seat Hold | Booking Service | Merge | A hold is a temporary state within the booking lifecycle and must be controlled together with seat inventory. |
 | Booking | Booking Service | Separate | Booking is the central reservation domain and directly corresponds to the problem statement's Booking Service. |
 | Payment | Payment Service | Separate | Payment has independent state, retry, timeout, idempotency, reconciliation, and external-provider interaction. |
-| Authentication | User & Identity Service | Separate | Authentication and identity form a security boundary shared by multiple business domains. |
+| Authentication | User Service | Separate | Authentication and identity form a security boundary shared by multiple business domains. |
 | Ticket | Booking Service | Merge | A ticket is produced from a confirmed booking and does not require an independent business boundary for the current scope. |
 | Cancellation | Booking Service | Merge | Cancellation changes the booking lifecycle. The cancellation policy itself is configured with the Show domain. |
 | Refund | Payment Service | Merge | Refund is a financial operation and belongs to the payment domain. |
@@ -134,7 +134,7 @@ The following BookNGo capabilities were evaluated during decomposition:
 
 The decomposition results in six business microservices.
 
-### 5.1 User & Identity Service
+### 5.1 User Service
 
 Responsible for identity and access-related functionality.
 
@@ -558,7 +558,7 @@ The correctness of seat allocation must remain independent of the number of Book
 
 | Service                 | Primary Data Owned                                                    |
 | ----------------------- | --------------------------------------------------------------------- |
-| User & Identity Service | Users, roles, authentication data, OTP metadata, operator assignments |
+| User Service | Users, roles, authentication data, OTP metadata, operator assignments |
 | Movie Service           | Movies and movie metadata                                             |
 | Theatre Service         | Theatres, locations, screens, physical seats, seat categories         |
 | Show Service            | Shows, schedules, pricing, cancellation policies                      |
@@ -584,7 +584,7 @@ Show Service              →    Show Service
 
 Booking Service           →    Booking Service
 
-User Service              →    User & Identity Service
+User Service              →    User Service
 ```
 
 Additional services are introduced only where the requirements provide a clear boundary:
@@ -678,7 +678,7 @@ Separating each of these capabilities would create additional distributed commun
 The BookNGo business layer consists of:
 
 ```text
-1. User & Identity Service
+1. User Service
 2. Movie Service
 3. Theatre Service
 4. Show Service

@@ -99,7 +99,7 @@ The logical communication topology is:
                     +------------+------------+
                     |            |            |
                     v            v            v
-              User & Identity  Movie      Theatre
+              User Service  Movie      Theatre
                     |          Service      Service
                     |            |            |
                     |            |            |
@@ -164,7 +164,7 @@ The API Gateway routes external requests to the appropriate service.
 
 Conceptually:
 
-/api/auth/**       -> User & Identity Service
+/api/auth/**       -> User Service
 
 /api/movies/**     -> Movie Service
 
@@ -186,7 +186,7 @@ Eureka provides service registration and discovery.
 
 At startup:
 
-User & Identity Service
+User Service
         |
         v
      Eureka
@@ -256,10 +256,10 @@ The Gateway does not implement movie business logic.
 
 It only routes the request to the service responsible for that capability.
 
-8. User & Identity Communication
+8. User Service Communication
 8.1 Authentication
 
-Authentication is handled by User & Identity Service.
+Authentication is handled by User Service.
 
 Frontend
     |
@@ -267,7 +267,7 @@ Frontend
 API Gateway
     |
     v
-User & Identity Service
+User Service
     |
     v
 User Database
@@ -397,7 +397,7 @@ Booking Service is the central service for booking transactions.
 
 It may need information owned by:
 
-User & Identity Service.
+User Service.
 Show Service.
 Theatre Service.
 Payment Service.
@@ -407,7 +407,7 @@ However, it does not own those domains.
 Conceptually:
 
                  +----------------+
-                 | User & Identity|
+                 | User Service|
                  +-------+--------+
                          |
                          |

@@ -25,9 +25,9 @@ Theatre Operations
 └── Configure cancellation policy
 
 Platform
-├── Authentication
-├── OTP
-├── Authorization
+├── Authentication (User Service)
+├── OTP (User Service)
+├── Authorization (User Service)
 ├── Booking orchestration
 ├── Payment processing
 └── Ticket generation

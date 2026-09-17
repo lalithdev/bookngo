@@ -77,7 +77,7 @@ Infrastructure components include:
 
 Business services currently identified are:
 
-1. User & Identity Service
+1. User Service
 2. Movie Service
 3. Theatre Service
 4. Show Service
@@ -159,6 +159,14 @@ ADMIN
 The system shall verify that users have permission to access or modify the requested resource.
 
 A theatre operator shall only manage assigned theatres.
+
+### FR-AUTH-09 — Role-Specific Authentication Credentials
+
+The system shall authenticate users according to their assigned role:
+- CUSTOMER users shall authenticate using Phone Number + OTP.
+- THEATRE_OPERATOR users shall authenticate using Username + Password.
+- ADMIN users shall authenticate using Username + Password.
+All authenticated roles shall receive a signed JWT upon successful authentication.
 
 ---
 
@@ -1134,7 +1142,7 @@ The initial implementation may use a simulated payment provider.
 
 ## 39.2 OTP
 
-The User & Identity Service shall act as the boundary for OTP functionality.
+The User Service shall act as the boundary for OTP functionality.
 
 The initial implementation may simulate OTP delivery.
 
@@ -1146,9 +1154,9 @@ External integrations must not own BookNGo's internal booking state.
 
 | Requirement Area             | Primary Service |
 | ---------------------------- | --------------- |
-| Authentication               | User & Identity |
-| Users                        | User & Identity |
-| OTP                          | User & Identity |
+| Authentication               | User Service |
+| Users                        | User Service |
+| OTP                          | User Service |
 | Movies                       | Movie           |
 | Theatre                      | Theatre         |
 | Screens                      | Theatre         |
