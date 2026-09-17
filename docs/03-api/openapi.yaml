@@ -1,0 +1,2291 @@
+openapi: 3.0.3
+info:
+  title: BookNGo API Specification
+  description: |
+    Official OpenAPI contract for BookNGo movie ticket booking system.
+    
+    Architectural Principles:
+    - 6 Business Microservices: User Service, Movie Service, Theatre Service, Show Service, Booking Service, Payment Service.
+    - 2 Infrastructure Components: Eureka Server, API Gateway.
+    - Database-per-Service isolation (user_db, movie_db, theatre_db, show_db, booking_db, payment_db).
+    - Public Frontend APIs (/api/v1/**), Internal Service Contracts (/internal/v1/**), and External Provider Callbacks.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local API Gateway
+
+tags:
+  - name: User Service
+    description: User accounts, authentication credentials, OTP verifications, and roles.
+  - name: Movie Service
+    description: Movie catalog and metadata management.
+  - name: Theatre Service
+    description: Physical theatres, screens, physical seat layouts, and operator assignments.
+  - name: Show Service
+    description: Show schedules, show-specific pricing, and cancellation policies.
+  - name: Booking Service
+    description: Real-time show seat inventory, seat holds, booking state, tickets, and booking idempotency.
+  - name: Payment Service
+    description: Payment processing, attempts, status reconciliations, refund reversals, and payment idempotency.
+  - name: Internal Service Contracts
+    description: Synchronous service-to-service communication endpoints (blocked at API Gateway).
+
+paths:
+  # ============================================================================
+  # USER SERVICE (/api/v1/auth/**, /api/v1/users/**)
+  # ============================================================================
+  /api/v1/auth/otp/request:
+    post:
+      tags:
+        - User Service
+      summary: Request Customer Phone OTP
+      description: Initiates OTP generation and simulation/delivery for customer phone authentication.
+      operationId: requestOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: OTP successfully generated/sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpRequestResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '429':
+          $ref: '#/components/responses/429TooManyRequests'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/auth/otp/verify:
+    post:
+      tags:
+        - User Service
+      summary: Verify Customer Phone OTP
+      description: Verifies OTP code against otp_verifications, auto-creates user if new customer, and issues signed JWT.
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: OTP verified and JWT token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - User Service
+      summary: Password Login (Operator & Admin)
+      description: Authenticates Theatre Operators and Admins using username/phone/email and password against users.password_hash.
+      operationId: loginPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Credentials authenticated and JWT token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/users/me:
+    get:
+      tags:
+        - User Service
+      summary: Get Current User Profile
+      description: Returns profile details for the authenticated user (JWT sub).
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    put:
+      tags:
+        - User Service
+      summary: Update Current User Profile
+      description: Updates profile information for the authenticated user.
+      operationId: updateCurrentUser
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdateRequest'
+      responses:
+        '200':
+          description: Profile successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  # ============================================================================
+  # MOVIE SERVICE (/api/v1/movies/**)
+  # ============================================================================
+  /api/v1/movies:
+    get:
+      tags:
+        - Movie Service
+      summary: List / Search Movies
+      description: Returns a paginated list of movies filtered by title, language, genre, or status.
+      operationId: listMovies
+      parameters:
+        - name: title
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: language
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: genre
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ACTIVE, DRAFT, INACTIVE, ARCHIVED]
+            default: ACTIVE
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Page of movies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Movie'
+                  totalElements:
+                    type: integer
+                  totalPages:
+                    type: integer
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    post:
+      tags:
+        - Movie Service
+      summary: Create Movie
+      description: Creates a new movie entry (Admin role required).
+      operationId: createMovie
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovieCreateRequest'
+      responses:
+        '201':
+          description: Movie created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movie'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/movies/{movieId}:
+    get:
+      tags:
+        - Movie Service
+      summary: Get Movie Details
+      description: Returns details for a specific movie.
+      operationId: getMovieById
+      parameters:
+        - $ref: '#/components/parameters/MovieIdPath'
+      responses:
+        '200':
+          description: Movie details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movie'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    put:
+      tags:
+        - Movie Service
+      summary: Update Movie
+      description: Updates an existing movie entry (Admin role required).
+      operationId: updateMovie
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MovieIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovieCreateRequest'
+      responses:
+        '200':
+          description: Movie updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movie'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    delete:
+      tags:
+        - Movie Service
+      summary: Deactivate Movie
+      description: Soft-deletes/deactivates a movie (Admin role required).
+      operationId: deleteMovie
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MovieIdPath'
+      responses:
+        '204':
+          description: Movie deactivated successfully
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  # ============================================================================
+  # THEATRE SERVICE (/api/v1/theatres/**, /api/v1/screens/**)
+  # ============================================================================
+  /api/v1/theatres:
+    get:
+      tags:
+        - Theatre Service
+      summary: List Theatres
+      description: Returns a list of active theatres, optionally filtered by city.
+      operationId: listTheatres
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of theatres
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Theatre'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    post:
+      tags:
+        - Theatre Service
+      summary: Create Theatre
+      description: Registers a new theatre (Theatre Operator / Admin role required).
+      operationId: createTheatre
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TheatreCreateRequest'
+      responses:
+        '201':
+          description: Theatre created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Theatre'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/theatres/{theatreId}:
+    get:
+      tags:
+        - Theatre Service
+      summary: Get Theatre Details
+      operationId: getTheatreById
+      parameters:
+        - $ref: '#/components/parameters/TheatreIdPath'
+      responses:
+        '200':
+          description: Theatre details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Theatre'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    put:
+      tags:
+        - Theatre Service
+      summary: Update Theatre
+      description: Updates theatre information (Requires Operator assigned to theatre in theatre_operator_assignments, or Admin).
+      operationId: updateTheatre
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TheatreIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TheatreCreateRequest'
+      responses:
+        '200':
+          description: Theatre updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Theatre'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/theatres/{theatreId}/screens:
+    get:
+      tags:
+        - Theatre Service
+      summary: Get Screens for Theatre
+      operationId: getScreensByTheatre
+      parameters:
+        - $ref: '#/components/parameters/TheatreIdPath'
+      responses:
+        '200':
+          description: List of screens
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Screen'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    post:
+      tags:
+        - Theatre Service
+      summary: Create Screen for Theatre
+      operationId: createScreen
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TheatreIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenCreateRequest'
+      responses:
+        '201':
+          description: Screen created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Screen'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/screens/{screenId}/seats:
+    get:
+      tags:
+        - Theatre Service
+      summary: Get Physical Seat Layout for Screen
+      description: Returns static physical seat configuration (row_label, seat_number, seat_category). Does NOT represent show-specific availability.
+      operationId: getPhysicalSeatsByScreen
+      parameters:
+        - $ref: '#/components/parameters/ScreenIdPath'
+      responses:
+        '200':
+          description: Physical seat layout
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PhysicalSeat'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    post:
+      tags:
+        - Theatre Service
+      summary: Configure Physical Seats for Screen
+      description: Defines permanent physical seats for a screen (Requires Operator assigned to theatre or Admin).
+      operationId: configurePhysicalSeats
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ScreenIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - seats
+              properties:
+                seats:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PhysicalSeatCreateRequest'
+      responses:
+        '201':
+          description: Physical seats configured
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PhysicalSeat'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  # ============================================================================
+  # SHOW SERVICE (/api/v1/shows/**)
+  # ============================================================================
+  /api/v1/shows:
+    get:
+      tags:
+        - Show Service
+      summary: Search Shows
+      description: Searches scheduled movie screenings by movie, theatre, city, date, language, or format.
+      operationId: searchShows
+      parameters:
+        - name: movieId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: theatreId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: language
+          in: query
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matching shows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Show'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    post:
+      tags:
+        - Show Service
+      summary: Create / Schedule Show
+      description: Schedules a movie screening on a specific screen (Operator assigned to theatre or Admin required).
+      operationId: createShow
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShowCreateRequest'
+      responses:
+        '201':
+          description: Show scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Show'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/shows/{showId}:
+    get:
+      tags:
+        - Show Service
+      summary: Get Show Details
+      operationId: getShowById
+      parameters:
+        - $ref: '#/components/parameters/ShowIdPath'
+      responses:
+        '200':
+          description: Show details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Show'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/shows/{showId}/pricing:
+    get:
+      tags:
+        - Show Service
+      summary: Get Show Pricing
+      description: Returns price configuration per seat category for a show.
+      operationId: getShowPricing
+      parameters:
+        - $ref: '#/components/parameters/ShowIdPath'
+      responses:
+        '200':
+          description: Show pricing list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ShowPricing'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    put:
+      tags:
+        - Show Service
+      summary: Configure Show Pricing
+      description: Sets pricing for seat categories of a show (Operator assigned to theatre or Admin required).
+      operationId: configureShowPricing
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ShowIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pricing
+              properties:
+                pricing:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ShowPricingUpdateRequest'
+      responses:
+        '200':
+          description: Pricing updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ShowPricing'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/shows/{showId}/cancellation-policy:
+    get:
+      tags:
+        - Show Service
+      summary: Get Show Cancellation Policy
+      operationId: getCancellationPolicy
+      parameters:
+        - $ref: '#/components/parameters/ShowIdPath'
+      responses:
+        '200':
+          description: Cancellation policy details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancellationPolicy'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    put:
+      tags:
+        - Show Service
+      summary: Configure Cancellation Policy
+      operationId: configureCancellationPolicy
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ShowIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancellationPolicyUpdateRequest'
+      responses:
+        '200':
+          description: Cancellation policy updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancellationPolicy'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  # ============================================================================
+  # BOOKING SERVICE (/api/v1/shows/{showId}/seat-inventory, /api/v1/holds/**, /api/v1/bookings/**)
+  # ============================================================================
+  /api/v1/shows/{showId}/seat-inventory:
+    get:
+      tags:
+        - Booking Service
+      summary: Get Real-Time Show Seat Availability
+      description: Returns real-time show-specific seat inventory states (AVAILABLE, HELD, BOOKED).
+      operationId: getShowSeatInventory
+      parameters:
+        - $ref: '#/components/parameters/ShowIdPath'
+      responses:
+        '200':
+          description: Show seat availability
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SeatInventoryItem'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/shows/{showId}/holds:
+    post:
+      tags:
+        - Booking Service
+      summary: Create Seat Hold (Hold & Booking Initialization Entry Point)
+      description: |
+        Single public customer entry point when clicking 'Proceed to Book'.
+        Enforces maximum 6 seats, sorts seat IDs deterministically, atomically acquires available/expired inventory, creates Booking (INITIATED), creates Seat Hold (ACTIVE, 5-min normal expiry), and marks inventory HELD.
+      operationId: createSeatHold
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ShowIdPath'
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeatHoldRequest'
+      responses:
+        '201':
+          description: Hold and booking initialized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatHoldResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '422':
+          $ref: '#/components/responses/422UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/holds/{holdId}:
+    get:
+      tags:
+        - Booking Service
+      summary: Get Hold Status
+      description: Returns active hold details and remaining time (Customer owner only).
+      operationId: getHoldById
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/HoldIdPath'
+      responses:
+        '200':
+          description: Hold details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatHold'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+    delete:
+      tags:
+        - Booking Service
+      summary: Release Seat Hold (Customer Unpaid Release)
+      description: Releases an unpaid ACTIVE hold before expiry. Must NOT allow release of PAYMENT_PENDING or BOOKED holds.
+      operationId: releaseHold
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/HoldIdPath'
+      responses:
+        '204':
+          description: Hold successfully released
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/bookings/me:
+    get:
+      tags:
+        - Booking Service
+      summary: List My Bookings
+      description: Returns booking history for the logged-in customer.
+      operationId: getMyBookings
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Customer booking list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/bookings/{bookingId}:
+    get:
+      tags:
+        - Booking Service
+      summary: Get Booking Details
+      description: Returns booking details (Customer owner, assigned Theatre Operator, or Admin).
+      operationId: getBookingById
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BookingIdPath'
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/bookings/{bookingId}/cancel:
+    post:
+      tags:
+        - Booking Service
+      summary: Cancel Confirmed Booking
+      description: Cancels a confirmed booking if policy permits, releases inventory to AVAILABLE, and triggers Payment Service refund.
+      operationId: cancelBooking
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BookingIdPath'
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '422':
+          $ref: '#/components/responses/422UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/bookings/{bookingId}/ticket:
+    get:
+      tags:
+        - Booking Service
+      summary: Get Issued Ticket
+      description: Returns ticket QR code metadata for confirmed bookings. Accessible ONLY when status is CONFIRMED or TICKET_ISSUED.
+      operationId: getTicketByBooking
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BookingIdPath'
+      responses:
+        '200':
+          description: Issued ticket details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  # ============================================================================
+  # PAYMENT SERVICE (/api/v1/payments/**)
+  # ============================================================================
+  /api/v1/payments:
+    post:
+      tags:
+        - Payment Service
+      summary: Initiate Payment
+      description: |
+        Initiates payment for a booking in HELD state.
+        Client supplies bookingId and providerName ONLY (NO client-authoritative amount or currency).
+        Payment Service calls Booking Service internal API to apply 2-minute payment grace and retrieve authoritative payable amount.
+      operationId: initiatePayment
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentInitiateRequest'
+      responses:
+        '201':
+          description: Payment initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/payments/{paymentId}/status:
+    get:
+      tags:
+        - Payment Service
+      summary: Get Payment Status
+      operationId: getPaymentStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentIdPath'
+      responses:
+        '200':
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatusResponse'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/payments/provider/callback:
+    post:
+      tags:
+        - Payment Service
+      summary: External Payment Provider Callback Webhook
+      description: |
+        External payment provider callback endpoint.
+        Does NOT require customer JWT. Authenticated via Provider Signature header (X-Provider-Signature).
+        Deduplication relies on providerPaymentReference. Idempotently processes SUCCESS, FAILURE, CANCELLED, or UNKNOWN outcomes and triggers internal Booking Service update.
+      operationId: paymentProviderCallback
+      security:
+        - ProviderSignatureAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderCallbackRequest'
+      responses:
+        '200':
+          description: Callback processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  acknowledged:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/payments/{paymentId}/reconcile:
+    post:
+      tags:
+        - Payment Service
+      summary: Trigger Payment Reconciliation
+      description: Reconciles UNKNOWN or TIMEOUT payments by checking provider status (Admin / Scheduled Job).
+      operationId: reconcilePayment
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentIdPath'
+      responses:
+        '200':
+          description: Payment reconciled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentReconciliationResponse'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /api/v1/payments/{paymentId}/refund:
+    get:
+      tags:
+        - Payment Service
+      summary: Get Refund Status
+      operationId: getRefundStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentIdPath'
+      responses:
+        '200':
+          description: Refund reversal details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundReversalResponse'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  # ============================================================================
+  # INTERNAL SERVICE CONTRACTS (/internal/v1/**)
+  # ============================================================================
+  /internal/v1/bookings/{bookingId}/apply-payment-pending:
+    post:
+      tags:
+        - Internal Service Contracts
+      summary: '[INTERNAL] Apply Payment Pending & Grace Period'
+      description: Called by Payment Service. Booking Service validates active hold, sets 2-minute payment grace period on seat_holds and bookings, updates status to PAYMENT_PENDING, and returns authoritative payable amount. Not available to public clients.
+      operationId: internalApplyPaymentPending
+      security:
+        - InternalServiceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BookingIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Payment pending applied and amount returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplyPaymentPendingInternalResponse'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /internal/v1/bookings/{bookingId}/payment-outcome:
+    post:
+      tags:
+        - Internal Service Contracts
+      summary: '[INTERNAL] Process Final Payment Outcome'
+      description: Called by Payment Service. Booking Service updates inventory and booking status based on payment result (SUCCESS -> BOOKED/CONFIRMED; FAILURE -> AVAILABLE/PAYMENT_FAILED). Not available to public clients.
+      operationId: internalPaymentOutcome
+      security:
+        - InternalServiceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/BookingIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - paymentId
+                - outcome
+              properties:
+                paymentId:
+                  type: string
+                  format: uuid
+                outcome:
+                  type: string
+                  enum: [SUCCESS, FAILURE, CANCELLED, UNKNOWN]
+      responses:
+        '200':
+          description: Outcome processed by Booking Service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOutcomeInternalResponse'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /internal/v1/payments/{paymentId}/refund:
+    post:
+      tags:
+        - Internal Service Contracts
+      summary: '[INTERNAL] Initiate Refund Reversal'
+      description: Called by Booking Service upon cancellation to trigger refund creation in Payment Service. Not available to public clients.
+      operationId: internalInitiateRefund
+      security:
+        - InternalServiceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PaymentIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - bookingId
+                - reason
+              properties:
+                bookingId:
+                  type: string
+                  format: uuid
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Refund reversal initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundReversalResponse'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+  /internal/v1/shows/{showId}/cancellation-policy:
+    get:
+      tags:
+        - Internal Service Contracts
+      summary: '[INTERNAL] Fetch Show Cancellation Policy'
+      description: Called by Booking Service to evaluate cancellation eligibility. Not available to public clients.
+      operationId: internalGetCancellationPolicy
+      security:
+        - InternalServiceAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ShowIdPath'
+      responses:
+        '200':
+          description: Cancellation policy details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancellationPolicy'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '500':
+          $ref: '#/components/responses/500InternalServerError'
+
+# ============================================================================
+# COMPONENTS (SCHEMAS, SECURITY SCHEMES, RESPONSES, PARAMETERS)
+# ============================================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Customer, Operator, or Admin JWT token.
+    ProviderSignatureAuth:
+      type: apiKey
+      in: header
+      name: X-Provider-Signature
+      description: External Payment Provider signature header.
+    InternalServiceAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Internal service-to-service authentication. Not available to public clients.
+
+  parameters:
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique operation key for idempotency deduplication.
+    MovieIdPath:
+      name: movieId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TheatreIdPath:
+      name: theatreId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ScreenIdPath:
+      name: screenId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ShowIdPath:
+      name: showId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    HoldIdPath:
+      name: holdId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BookingIdPath:
+      name: bookingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PaymentIdPath:
+      name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    400BadRequest:
+      description: Bad Request (Validation failure or syntax error)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    401Unauthorized:
+      description: Unauthorized (Missing or invalid authentication token)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    403Forbidden:
+      description: Forbidden (Insufficient permissions or unauthorized resource owner)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    404NotFound:
+      description: Not Found (Resource ID does not exist)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    409Conflict:
+      description: Conflict (State conflict, seat already held/booked, or idempotency mismatch)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    422UnprocessableEntity:
+      description: Unprocessable Entity (Business rule invariant violation)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    429TooManyRequests:
+      description: Too Many Requests (Rate limit exceeded)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    500InternalServerError:
+      description: Internal Server Error (Unexpected server error)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    503ServiceUnavailable:
+      description: Service Unavailable (Gateway or service offline)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # --- Error Schema ---
+    ErrorResponse:
+      type: object
+      required:
+        - timestamp
+        - status
+        - error
+        - code
+        - message
+        - path
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        error:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              issue:
+                type: string
+
+    # --- User Domain ---
+    User:
+      type: object
+      required:
+        - userId
+        - fullName
+        - phoneNumber
+        - accountStatus
+        - roles
+      properties:
+        userId:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        phoneNumber:
+          type: string
+        email:
+          type: string
+          nullable: true
+        accountStatus:
+          type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [CUSTOMER, THEATRE_OPERATOR, ADMIN]
+        createdAt:
+          type: string
+          format: date-time
+
+    OtpRequest:
+      type: object
+      required:
+        - phoneNumber
+      properties:
+        phoneNumber:
+          type: string
+          pattern: '^\+[1-9]\d{1,14}$'
+
+    OtpRequestResponse:
+      type: object
+      required:
+        - otpId
+        - phoneNumber
+        - status
+        - expiresAt
+      properties:
+        otpId:
+          type: string
+          format: uuid
+        phoneNumber:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, VERIFIED, EXPIRED, REJECTED, LOCKED]
+        expiresAt:
+          type: string
+          format: date-time
+
+    OtpVerifyRequest:
+      type: object
+      required:
+        - phoneNumber
+        - otpCode
+      properties:
+        phoneNumber:
+          type: string
+        otpCode:
+          type: string
+          pattern: '^\d{6}$'
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthTokenResponse:
+      type: object
+      required:
+        - token
+        - tokenType
+        - expiresIn
+        - user
+      properties:
+        token:
+          type: string
+        tokenType:
+          type: string
+          default: Bearer
+        expiresIn:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+
+    UserProfileUpdateRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+
+    # --- Movie Domain ---
+    Movie:
+      type: object
+      required:
+        - movieId
+        - title
+        - language
+        - genres
+        - durationMinutes
+        - status
+      properties:
+        movieId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        language:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        durationMinutes:
+          type: integer
+        releaseDate:
+          type: string
+          format: date
+          nullable: true
+        posterReference:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, INACTIVE, ARCHIVED]
+
+    MovieCreateRequest:
+      type: object
+      required:
+        - title
+        - language
+        - genres
+        - durationMinutes
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        language:
+          type: string
+        genres:
+          type: array
+          items:
+            type: string
+        durationMinutes:
+          type: integer
+        releaseDate:
+          type: string
+          format: date
+        posterReference:
+          type: string
+
+    # --- Theatre Domain ---
+    Theatre:
+      type: object
+      required:
+        - theatreId
+        - name
+        - address
+        - city
+        - status
+      properties:
+        theatreId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        locationMetadata:
+          type: object
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, CLOSED]
+
+    TheatreCreateRequest:
+      type: object
+      required:
+        - name
+        - address
+        - city
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+
+    Screen:
+      type: object
+      required:
+        - screenId
+        - theatreId
+        - name
+        - status
+      properties:
+        screenId:
+          type: string
+          format: uuid
+        theatreId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        screenFormat:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, MAINTENANCE]
+
+    ScreenCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        screenFormat:
+          type: string
+
+    PhysicalSeat:
+      type: object
+      required:
+        - physicalSeatId
+        - screenId
+        - rowLabel
+        - seatNumber
+        - seatCategory
+        - status
+      properties:
+        physicalSeatId:
+          type: string
+          format: uuid
+        screenId:
+          type: string
+          format: uuid
+        rowLabel:
+          type: string
+        seatNumber:
+          type: string
+        seatCategory:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, MAINTENANCE]
+
+    PhysicalSeatCreateRequest:
+      type: object
+      required:
+        - rowLabel
+        - seatNumber
+        - seatCategory
+      properties:
+        rowLabel:
+          type: string
+        seatNumber:
+          type: string
+        seatCategory:
+          type: string
+
+    # --- Show Domain ---
+    Show:
+      type: object
+      required:
+        - showId
+        - movieId
+        - theatreId
+        - screenId
+        - startsAt
+        - endsAt
+        - status
+      properties:
+        showId:
+          type: string
+          format: uuid
+        movieId:
+          type: string
+          format: uuid
+        theatreId:
+          type: string
+          format: uuid
+        screenId:
+          type: string
+          format: uuid
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        showFormat:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [DRAFT, SCHEDULED, CANCELLED, COMPLETED]
+
+    ShowCreateRequest:
+      type: object
+      required:
+        - movieId
+        - theatreId
+        - screenId
+        - startsAt
+        - endsAt
+      properties:
+        movieId:
+          type: string
+          format: uuid
+        theatreId:
+          type: string
+          format: uuid
+        screenId:
+          type: string
+          format: uuid
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        showFormat:
+          type: string
+
+    ShowPricing:
+      type: object
+      required:
+        - showPricingId
+        - showId
+        - seatCategory
+        - amount
+        - currency
+        - status
+      properties:
+        showPricingId:
+          type: string
+          format: uuid
+        showId:
+          type: string
+          format: uuid
+        seatCategory:
+          type: string
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+
+    ShowPricingUpdateRequest:
+      type: object
+      required:
+        - seatCategory
+        - amount
+        - currency
+      properties:
+        seatCategory:
+          type: string
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+
+    CancellationPolicy:
+      type: object
+      required:
+        - cancellationPolicyId
+        - showId
+        - policyType
+        - status
+      properties:
+        cancellationPolicyId:
+          type: string
+          format: uuid
+        showId:
+          type: string
+          format: uuid
+        policyType:
+          type: string
+          enum: [CANCELLABLE, NON_CANCELLABLE]
+        cancellationDeadline:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+
+    CancellationPolicyUpdateRequest:
+      type: object
+      required:
+        - policyType
+      properties:
+        policyType:
+          type: string
+          enum: [CANCELLABLE, NON_CANCELLABLE]
+        cancellationDeadline:
+          type: string
+          format: date-time
+
+    # --- Booking Domain & Enums ---
+    BookingState:
+      type: string
+      enum:
+        - INITIATED
+        - HELD
+        - PAYMENT_PENDING
+        - CONFIRMED
+        - TICKET_ISSUED
+        - EXPIRED
+        - CANCELLED
+        - PAYMENT_FAILED
+        - PAYMENT_CANCELLED
+        - PAYMENT_UNKNOWN
+        - REFUND_PENDING
+        - REFUNDED
+
+    SeatInventoryItem:
+      type: object
+      required:
+        - showSeatInventoryId
+        - physicalSeatId
+        - status
+      properties:
+        showSeatInventoryId:
+          type: string
+          format: uuid
+        physicalSeatId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [AVAILABLE, HELD, BOOKED]
+        holdExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    SeatHoldRequest:
+      type: object
+      required:
+        - physicalSeatIds
+      properties:
+        physicalSeatIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    SeatHoldResponse:
+      type: object
+      required:
+        - holdId
+        - bookingId
+        - showId
+        - status
+        - normalExpiresAt
+        - totalAmount
+        - currency
+      properties:
+        holdId:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        showId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED, RELEASED, CONVERTED]
+          description: Current status of the seat hold (ACTIVE, EXPIRED, RELEASED, CONVERTED). Note that the associated booking is initially created in INITIATED status.
+        normalExpiresAt:
+          type: string
+          format: date-time
+        paymentGraceExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        totalAmount:
+          type: number
+          format: double
+        currency:
+          type: string
+
+    SeatHold:
+      type: object
+      required:
+        - holdId
+        - bookingId
+        - showId
+        - status
+        - normalExpiresAt
+      properties:
+        holdId:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        showId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED, RELEASED, CONVERTED]
+          description: Current status of the seat hold (ACTIVE, EXPIRED, RELEASED, CONVERTED).
+        normalExpiresAt:
+          type: string
+          format: date-time
+        paymentGraceExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Booking:
+      type: object
+      required:
+        - bookingId
+        - userId
+        - showId
+        - totalAmount
+        - currency
+        - status
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        showId:
+          type: string
+          format: uuid
+        totalAmount:
+          type: number
+          format: double
+        currency:
+          type: string
+        status:
+          $ref: '#/components/schemas/BookingState'
+        paymentGraceExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        paymentId:
+          type: string
+          format: uuid
+          nullable: true
+        bookingSeats:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingSeat'
+        createdAt:
+          type: string
+          format: date-time
+
+    BookingSeat:
+      type: object
+      required:
+        - bookingSeatId
+        - physicalSeatId
+        - seatLabelSnapshot
+        - seatCategorySnapshot
+        - unitPriceSnapshot
+      properties:
+        bookingSeatId:
+          type: string
+          format: uuid
+        physicalSeatId:
+          type: string
+          format: uuid
+        seatLabelSnapshot:
+          type: string
+        seatCategorySnapshot:
+          type: string
+        unitPriceSnapshot:
+          type: number
+          format: double
+
+    Ticket:
+      type: object
+      required:
+        - ticketId
+        - bookingId
+        - ticketCode
+        - status
+        - historicalSnapshot
+        - issuedAt
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        ticketCode:
+          type: string
+        status:
+          type: string
+          enum: [ISSUED, CANCELLED, INVALIDATED]
+        historicalSnapshot:
+          type: object
+        issuedAt:
+          type: string
+          format: date-time
+
+    # --- Payment Domain & Enums ---
+    PaymentState:
+      type: string
+      enum:
+        - INITIATED
+        - PENDING
+        - SUCCESS
+        - FAILURE
+        - CANCELLED
+        - TIMEOUT
+        - UNKNOWN
+        - REFUND_PENDING
+        - REFUNDED
+
+    PaymentInitiateRequest:
+      type: object
+      required:
+        - bookingId
+        - providerName
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        providerName:
+          type: string
+
+    PaymentResponse:
+      type: object
+      required:
+        - paymentId
+        - bookingId
+        - amount
+        - currency
+        - status
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+        status:
+          $ref: '#/components/schemas/PaymentState'
+        providerPaymentReference:
+          type: string
+          nullable: true
+        paymentGraceExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PaymentStatusResponse:
+      type: object
+      required:
+        - paymentId
+        - bookingId
+        - status
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        bookingId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/PaymentState'
+        providerPaymentReference:
+          type: string
+          nullable: true
+
+    ProviderCallbackRequest:
+      type: object
+      required:
+        - paymentId
+        - providerPaymentReference
+        - providerStatus
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        providerPaymentReference:
+          type: string
+        providerStatus:
+          type: string
+          enum: [SUCCESS, FAILURE, CANCELLED, UNKNOWN]
+
+    PaymentReconciliationResponse:
+      type: object
+      required:
+        - reconciliationId
+        - paymentId
+        - status
+      properties:
+        reconciliationId:
+          type: string
+          format: uuid
+        paymentId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, RESOLVED, FAILED]
+        providerStatusObserved:
+          type: string
+          nullable: true
+        resolvedPaymentStatus:
+          $ref: '#/components/schemas/PaymentState'
+
+    RefundReversalResponse:
+      type: object
+      required:
+        - refundReversalId
+        - paymentId
+        - amount
+        - status
+      properties:
+        refundReversalId:
+          type: string
+          format: uuid
+        paymentId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+        status:
+          type: string
+          enum: [INITIATED, REFUND_PENDING, REFUNDED, FAILED, CANCELLED]
+        providerReference:
+          type: string
+          nullable: true
+
+    # --- Internal DTO Schemas ---
+    ApplyPaymentPendingInternalResponse:
+      type: object
+      required:
+        - bookingId
+        - totalAmount
+        - currency
+        - status
+        - paymentGraceExpiresAt
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        totalAmount:
+          type: number
+          format: double
+        currency:
+          type: string
+        status:
+          $ref: '#/components/schemas/BookingState'
+        paymentGraceExpiresAt:
+          type: string
+          format: date-time
+
+    PaymentOutcomeInternalResponse:
+      type: object
+      required:
+        - bookingId
+        - bookingStatus
+        - ticketIssued
+      properties:
+        bookingId:
+          type: string
+          format: uuid
+        bookingStatus:
+          $ref: '#/components/schemas/BookingState'
+        ticketIssued:
+          type: boolean
