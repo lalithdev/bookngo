@@ -1,0 +1,67 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+
+            # =========================
+            # USER SERVICE
+            # =========================
+            - id: user-service
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/users/**
+
+            # =========================
+            # MOVIE SERVICE
+            # =========================
+            - id: movie-service
+              uri: lb://MOVIE-SERVICE
+              predicates:
+                - Path=/api/v1/movies/**
+
+            # =========================
+            # THEATRE SERVICE
+            # =========================
+            - id: theatre-service
+              uri: lb://THEATRE-SERVICE
+              predicates:
+                - Path=/api/v1/theatres/**
+
+            # =========================
+            # SHOW SERVICE
+            # =========================
+            - id: show-service
+              uri: lb://SHOW-SERVICE
+              predicates:
+                - Path=/api/v1/shows/**
+
+            # =========================
+            # BOOKING SERVICE
+            # =========================
+            - id: booking-service
+              uri: lb://BOOKING-SERVICE
+              predicates:
+                - Path=/api/v1/bookings/**
+
+            # =========================
+            # PAYMENT SERVICE
+            # =========================
+            - id: payment-service
+              uri: lb://PAYMENT-SERVICE
+              predicates:
+                - Path=/api/v1/payments/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
