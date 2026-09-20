@@ -1,0 +1,46 @@
+# Environment files / secrets
+.env
+.env.*
+!.env.example
+
+# Java / Maven
+**/target/
+**/*.class
+
+# Maven generated files
+**/pom.xml.tag
+**/pom.xml.releaseBackup
+**/pom.xml.versionsBackup
+**/pom.xml.next
+**/release.properties
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Eclipse / Spring Tool Suite
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+
+# Node.js / React
+**/node_modules/
+**/dist/
+**/build/
+
+# Test / coverage output
+**/coverage/
+
+# Logs
+**/*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
