@@ -33,7 +33,7 @@ spring:
             - id: theatre-service
               uri: lb://THEATRE-SERVICE
               predicates:
-                - Path=/api/v1/theatres/**
+                - Path=/api/v1/theatres/**,/api/v1/screens/**
 
             # =========================
             # SHOW SERVICE
