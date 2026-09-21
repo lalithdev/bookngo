@@ -36,20 +36,22 @@ spring:
                 - Path=/api/v1/theatres/**,/api/v1/screens/**
 
             # =========================
-            # SHOW SERVICE
-            # =========================
-            - id: show-service
-              uri: lb://SHOW-SERVICE
-              predicates:
-                - Path=/api/v1/shows/**
-
-            # =========================
             # BOOKING SERVICE
             # =========================
             - id: booking-service
               uri: lb://BOOKING-SERVICE
+              order: 1
               predicates:
-                - Path=/api/v1/bookings/**
+                - Path=/api/v1/bookings/**,/api/v1/holds/**,/api/v1/shows/*/seat-inventory,/api/v1/shows/*/holds
+
+            # =========================
+            # SHOW SERVICE
+            # =========================
+            - id: show-service
+              uri: lb://SHOW-SERVICE
+              order: 2
+              predicates:
+                - Path=/api/v1/shows/**
 
             # =========================
             # PAYMENT SERVICE

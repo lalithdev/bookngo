@@ -1,14 +1,17 @@
 server:
-  port: 8085
+  port: ${PORT:8085}
 
 spring:
   application:
     name: booking-service
 
+  config:
+    import: optional:file:.env[.properties]
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/bookngo_booking_db
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:bookngo_booking_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -22,6 +25,27 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+services:
+  theatre-service:
+    url: ${THEATRE_SERVICE_URL:http://localhost:8083}
+  movie-service:
+    url: ${MOVIE_SERVICE_URL:http://localhost:8082}
+  show-service:
+    url: ${SHOW_SERVICE_URL:http://localhost:8084}
+  payment-service:
+    url: ${PAYMENT_SERVICE_URL:http://localhost:8086}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
