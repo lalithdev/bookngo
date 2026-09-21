@@ -1,14 +1,17 @@
 server:
-  port: 8086
+  port: ${PORT:8086}
 
 spring:
   application:
     name: payment-service
 
+  config:
+    import: optional:file:.env[.properties]
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/bookngo_payment_db
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: postgres
-    password: postgres
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -19,9 +22,28 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  payment:
+    simulation-enabled: ${PAYMENT_SIMULATION_ENABLED:true}
+    provider-secret-key: ${PROVIDER_SECRET_KEY:simulated-provider-secret}
+
+services:
+  booking-service:
+    url: ${BOOKING_SERVICE_URL:http://localhost:8085}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
