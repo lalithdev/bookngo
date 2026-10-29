@@ -8,15 +8,17 @@ import org.springframework.stereotype.Component;
 import com.bookngo.userservice.entity.Role;
 import com.bookngo.userservice.repository.RoleRepository;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class RoleInitializer implements CommandLineRunner {
 
     private final RoleRepository roleRepository;
+
+    public RoleInitializer(RoleRepository roleRepository) {
+        this.roleRepository = roleRepository;
+    }
 
     @Override
     public void run(String... args) {
