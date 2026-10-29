@@ -4,9 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 
 import com.bookngo.bookingservice.dto.RefundRequest;
 import com.bookngo.bookingservice.dto.RefundResponse;
@@ -18,16 +16,14 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class PaymentServiceClient {
 
-    private final RestClient restClient;
+    private final PaymentFeignClient paymentFeignClient;
     private final JwtService jwtService;
     private static final UUID SYSTEM_INTERNAL_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     public PaymentServiceClient(
-            @Value("${services.payment-service.url:http://localhost:8086}") String paymentServiceUrl,
+            PaymentFeignClient paymentFeignClient,
             JwtService jwtService) {
-        this.restClient = RestClient.builder()
-                .baseUrl(paymentServiceUrl)
-                .build();
+        this.paymentFeignClient = paymentFeignClient;
         this.jwtService = jwtService;
     }
 
@@ -43,12 +39,10 @@ public class PaymentServiceClient {
                     .reason(reason)
                     .build();
 
-            RefundResponse response = restClient.post()
-                    .uri("/internal/v1/payments/{paymentId}/refund", paymentId)
-                    .header("Authorization", "Bearer " + token)
-                    .body(request)
-                    .retrieve()
-                    .body(RefundResponse.class);
+            RefundResponse response = paymentFeignClient.initiateRefund(
+                    "Bearer " + token,
+                    paymentId,
+                    request);
 
             return Optional.ofNullable(response);
         } catch (Exception e) {

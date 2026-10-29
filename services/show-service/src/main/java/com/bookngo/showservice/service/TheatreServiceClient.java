@@ -5,10 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+
+import com.bookngo.showservice.client.TheatreFeignClient;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -16,13 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class TheatreServiceClient {
 
-    private final RestClient restClient;
+    private final TheatreFeignClient theatreFeignClient;
 
-    public TheatreServiceClient(
-            @Value("${services.theatre-service.url:http://localhost:8083}") String theatreServiceUrl) {
-        this.restClient = RestClient.builder()
-                .baseUrl(theatreServiceUrl)
-                .build();
+    public TheatreServiceClient(TheatreFeignClient theatreFeignClient) {
+        this.theatreFeignClient = theatreFeignClient;
     }
 
     /**
@@ -34,13 +30,7 @@ public class TheatreServiceClient {
         }
 
         try {
-            List<Map<String, Object>> theatres = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/api/v1/theatres")
-                            .queryParam("city", city.trim())
-                            .build())
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+            List<Map<String, Object>> theatres = theatreFeignClient.getTheatres(city.trim());
 
             if (theatres == null || theatres.isEmpty()) {
                 return Collections.emptyList();

@@ -5,10 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+
+import com.bookngo.showservice.client.MovieFeignClient;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -16,13 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class MovieServiceClient {
 
-    private final RestClient restClient;
+    private final MovieFeignClient movieFeignClient;
 
-    public MovieServiceClient(
-            @Value("${services.movie-service.url:http://localhost:8082}") String movieServiceUrl) {
-        this.restClient = RestClient.builder()
-                .baseUrl(movieServiceUrl)
-                .build();
+    public MovieServiceClient(MovieFeignClient movieFeignClient) {
+        this.movieFeignClient = movieFeignClient;
     }
 
     /**
@@ -34,13 +30,7 @@ public class MovieServiceClient {
         }
 
         try {
-            List<Map<String, Object>> movies = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/api/v1/movies")
-                            .queryParam("language", language.trim())
-                            .build())
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+            List<Map<String, Object>> movies = movieFeignClient.getMovies(language.trim());
 
             if (movies == null || movies.isEmpty()) {
                 return Collections.emptyList();

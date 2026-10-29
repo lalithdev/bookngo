@@ -5,10 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 
 import com.bookngo.bookingservice.dto.CancellationPolicyDto;
 import com.bookngo.bookingservice.dto.ShowDto;
@@ -21,16 +18,14 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class ShowServiceClient {
 
-    private final RestClient restClient;
+    private final ShowFeignClient showFeignClient;
     private final JwtService jwtService;
     private static final UUID SYSTEM_INTERNAL_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     public ShowServiceClient(
-            @Value("${services.show-service.url:http://localhost:8084}") String showServiceUrl,
+            ShowFeignClient showFeignClient,
             JwtService jwtService) {
-        this.restClient = RestClient.builder()
-                .baseUrl(showServiceUrl)
-                .build();
+        this.showFeignClient = showFeignClient;
         this.jwtService = jwtService;
     }
 
@@ -40,10 +35,7 @@ public class ShowServiceClient {
         }
 
         try {
-            ShowDto show = restClient.get()
-                    .uri("/api/v1/shows/{showId}", showId)
-                    .retrieve()
-                    .body(ShowDto.class);
+            ShowDto show = showFeignClient.getShow(showId);
             return Optional.ofNullable(show);
         } catch (Exception e) {
             log.warn("Failed to fetch show {}: {}", showId, e.getMessage());
@@ -57,10 +49,7 @@ public class ShowServiceClient {
         }
 
         try {
-            List<ShowPricingDto> pricing = restClient.get()
-                    .uri("/api/v1/shows/{showId}/pricing", showId)
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<List<ShowPricingDto>>() {});
+            List<ShowPricingDto> pricing = showFeignClient.getShowPricing(showId);
             return pricing != null ? pricing : Collections.emptyList();
         } catch (Exception e) {
             log.warn("Failed to fetch pricing for show {}: {}", showId, e.getMessage());
@@ -75,11 +64,7 @@ public class ShowServiceClient {
 
         try {
             String token = jwtService.generateToken(SYSTEM_INTERNAL_USER_ID, List.of("ADMIN"));
-            CancellationPolicyDto policy = restClient.get()
-                    .uri("/internal/v1/shows/{showId}/cancellation-policy", showId)
-                    .header("Authorization", "Bearer " + token)
-                    .retrieve()
-                    .body(CancellationPolicyDto.class);
+            CancellationPolicyDto policy = showFeignClient.getCancellationPolicy("Bearer " + token, showId);
             return Optional.ofNullable(policy);
         } catch (Exception e) {
             log.warn("Failed to fetch cancellation policy for show {}: {}", showId, e.getMessage());

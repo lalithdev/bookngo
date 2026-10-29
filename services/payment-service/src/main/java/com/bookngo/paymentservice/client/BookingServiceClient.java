@@ -3,10 +3,7 @@ package com.bookngo.paymentservice.client;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestClient;
 
 import com.bookngo.paymentservice.dto.ApplyPaymentPendingRequest;
 import com.bookngo.paymentservice.dto.ApplyPaymentPendingResponse;
@@ -16,6 +13,7 @@ import com.bookngo.paymentservice.exception.ResourceNotFoundException;
 import com.bookngo.paymentservice.exception.UnprocessableEntityException;
 import com.bookngo.paymentservice.security.JwtService;
 
+import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -40,15 +38,13 @@ public class BookingServiceClient {
      */
     private static final UUID SYSTEM_INTERNAL_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
-    private final RestClient restClient;
+    private final BookingFeignClient bookingFeignClient;
     private final JwtService jwtService;
 
     public BookingServiceClient(
-            @Value("${services.booking-service.url:http://localhost:8085}") String bookingServiceUrl,
+            BookingFeignClient bookingFeignClient,
             JwtService jwtService) {
-        this.restClient = RestClient.builder()
-                .baseUrl(bookingServiceUrl)
-                .build();
+        this.bookingFeignClient = bookingFeignClient;
         this.jwtService = jwtService;
     }
 
@@ -66,19 +62,24 @@ public class BookingServiceClient {
                 .userId(userId)
                 .build();
         try {
-            ApplyPaymentPendingResponse response = restClient.post()
-                    .uri("/internal/v1/bookings/{bookingId}/apply-payment-pending", bookingId)
-                    .header("Authorization", "Bearer " + token)
-                    .body(request)
-                    .retrieve()
-                    .body(ApplyPaymentPendingResponse.class);
-            return response;
-        } catch (HttpClientErrorException.NotFound e) {
+            return bookingFeignClient.applyPaymentPending("Bearer " + token, bookingId, request);
+        } catch (FeignException.NotFound e) {
             throw new ResourceNotFoundException("Booking not found: " + bookingId);
-        } catch (HttpClientErrorException.Conflict e) {
+        } catch (FeignException.Conflict e) {
             throw new ConflictException("Booking is not in a payable state: " + bookingId);
-        } catch (HttpClientErrorException e) {
+        } catch (FeignException.FeignClientException e) {
             throw new UnprocessableEntityException("Booking Service rejected payment pending request: " + e.getMessage());
+        } catch (FeignException e) {
+            if (e.status() == 404) {
+                throw new ResourceNotFoundException("Booking not found: " + bookingId);
+            } else if (e.status() == 409) {
+                throw new ConflictException("Booking is not in a payable state: " + bookingId);
+            } else if (e.status() >= 400 && e.status() < 500) {
+                throw new UnprocessableEntityException("Booking Service rejected payment pending request: " + e.getMessage());
+            } else {
+                log.error("Failed to call applyPaymentPending on Booking Service for bookingId {}: {}", bookingId, e.getMessage());
+                throw new UnprocessableEntityException("Unable to reach Booking Service: " + e.getMessage());
+            }
         } catch (Exception e) {
             log.error("Failed to call applyPaymentPending on Booking Service for bookingId {}: {}", bookingId, e.getMessage());
             throw new UnprocessableEntityException("Unable to reach Booking Service: " + e.getMessage());
@@ -100,12 +101,7 @@ public class BookingServiceClient {
                 .outcome(outcome)
                 .build();
         try {
-            restClient.post()
-                    .uri("/internal/v1/bookings/{bookingId}/payment-outcome", bookingId)
-                    .header("Authorization", "Bearer " + token)
-                    .body(request)
-                    .retrieve()
-                    .toBodilessEntity();
+            bookingFeignClient.notifyPaymentOutcome("Bearer " + token, bookingId, request);
         } catch (Exception e) {
             // Log but do not rethrow: payment state is already committed, Booking Service
             // will reconcile via its own mechanisms or admin intervention.

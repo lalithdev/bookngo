@@ -5,6 +5,14 @@ spring:
   application:
     name: show-service
 
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 3000
+            readTimeout: 5000
+
   config:
     import: optional:file:.env[.properties]
 
@@ -38,4 +46,4 @@ services:
   theatre-service:
     url: ${THEATRE_SERVICE_URL:http://localhost:8083}
   movie-service:
-    url: ${MOVIE_SERVICE_URL:http://localhost:8082} 
+    url: ${MOVIE_SERVICE_URL:http://localhost:8082}

@@ -5,6 +5,14 @@ spring:
   application:
     name: payment-service
 
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 3000
+            readTimeout: 5000
+
   config:
     import: optional:file:.env[.properties]
 
