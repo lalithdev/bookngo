@@ -89,8 +89,8 @@ public class SecurityConfig {
                         // Provider callback: authenticated by ProviderSignatureFilter; permit here,
                         // the filter sets SecurityContext so @PreAuthorize works if needed.
                         .requestMatchers("/api/v1/payments/provider/callback").permitAll()
-                        // Internal endpoints protected by JWT (ADMIN role service-to-service token)
-                        .requestMatchers("/internal/v1/payments/**").authenticated()
+                        // Internal endpoints protected by JWT (SERVICE or ADMIN role service-to-service token)
+                        .requestMatchers("/internal/v1/payments/**").hasAnyRole("SERVICE", "ADMIN")
                         // All public payment APIs require authentication
                         .requestMatchers("/api/v1/payments/**").authenticated()
                         .anyRequest().authenticated()

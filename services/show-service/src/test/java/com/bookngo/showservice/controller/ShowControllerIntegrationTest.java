@@ -324,8 +324,10 @@ class ShowControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyType", is("CANCELLABLE")));
 
-        // 3. Internal get
-        mockMvc.perform(get("/internal/v1/shows/" + savedShow.getShowId() + "/cancellation-policy"))
+        // 3. Internal get (requires service or admin token)
+        String serviceToken = jwtService.generateToken(UUID.fromString("00000000-0000-0000-0000-000000000005"), List.of("SERVICE"));
+        mockMvc.perform(get("/internal/v1/shows/" + savedShow.getShowId() + "/cancellation-policy")
+                        .header("Authorization", "Bearer " + serviceToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyType", is("CANCELLABLE")));
     }

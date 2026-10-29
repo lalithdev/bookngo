@@ -81,7 +81,7 @@ public class OtpService {
 
         OtpVerification saved = otpRepository.save(verification);
 
-        // Simulation delivery log for Review 1
+        // Simulation delivery log: reveal plaintext OTP in console for developer/test access
         log.info("[OTP SIMULATION] Delivered OTP code [{}] to phone [{}] (expires in {}s)", otpCode, phoneNumber, expirationSeconds);
 
         return saved;

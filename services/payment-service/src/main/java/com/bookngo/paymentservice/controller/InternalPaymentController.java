@@ -23,7 +23,7 @@ import jakarta.validation.Valid;
  */
 @RestController
 @RequestMapping("/internal/v1/payments")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SERVICE', 'ADMIN')")
 public class InternalPaymentController {
 
     private final PaymentService paymentService;

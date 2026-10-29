@@ -3,6 +3,7 @@ package com.bookngo.showservice.controller;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +14,7 @@ import com.bookngo.showservice.service.ShowService;
 
 @RestController
 @RequestMapping("/internal/v1/shows")
+@PreAuthorize("hasAnyRole('SERVICE', 'ADMIN')")
 public class InternalShowController {
 
     private final ShowService showService;

@@ -174,4 +174,60 @@ class PaymentControllerSecurityTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paymentId").value(payment.getPaymentId().toString()));
     }
+
+    @Test
+    void unauthenticatedInternalRefund_returns401() throws Exception {
+        mockMvc.perform(post("/internal/v1/payments/" + UUID.randomUUID() + "/refund")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookingId\":\"" + UUID.randomUUID() + "\",\"reason\":\"CANCELLED\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void customer_cannotAccessInternalRefund_returns403() throws Exception {
+        mockMvc.perform(post("/internal/v1/payments/" + UUID.randomUUID() + "/refund")
+                        .header("Authorization", "Bearer " + userToken1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookingId\":\"" + UUID.randomUUID() + "\",\"reason\":\"CANCELLED\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void serviceToken_isAuthorizedOnInternalRefund() throws Exception {
+        String serviceToken = jwtService.generateToken(UUID.fromString("00000000-0000-0000-0000-000000000005"), List.of("SERVICE"));
+        // Returns 404 (payment not found) or domain error, proving auth check passed (not 401 or 403)
+        mockMvc.perform(post("/internal/v1/payments/" + UUID.randomUUID() + "/refund")
+                        .header("Authorization", "Bearer " + serviceToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookingId\":\"" + UUID.randomUUID() + "\",\"reason\":\"CANCELLED\"}"))
+                .andExpect(result -> {
+                    int s = result.getResponse().getStatus();
+                    org.junit.jupiter.api.Assertions.assertNotEquals(401, s, "Must not be 401");
+                    org.junit.jupiter.api.Assertions.assertNotEquals(403, s, "Must not be 403");
+                });
+    }
+
+    @Test
+    void malformedAndExpiredTokens_return401() throws Exception {
+        mockMvc.perform(get("/api/v1/payments/" + UUID.randomUUID() + "/status")
+                        .header("Authorization", "Bearer malformed.jwt.token"))
+                .andExpect(status().isUnauthorized());
+
+        JwtService expiredJwt = new JwtService("test-secret-key-for-payment-service-tests-at-least-32-chars", -5000);
+        String expired = expiredJwt.generateToken(UUID.randomUUID(), List.of("CUSTOMER"));
+
+        mockMvc.perform(get("/api/v1/payments/" + UUID.randomUUID() + "/status")
+                        .header("Authorization", "Bearer " + expired))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void jwtSecretValidation_throwsOnInvalidSecret() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> new JwtService(null, 3600000));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> new JwtService("", 3600000));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> new JwtService("   ", 3600000));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> new JwtService("short-key", 3600000));
+    }
 }

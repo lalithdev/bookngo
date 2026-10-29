@@ -84,7 +84,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/shows/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/shows/**").hasAnyRole("THEATRE_OPERATOR", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/shows/**").hasAnyRole("THEATRE_OPERATOR", "ADMIN")
-                        .requestMatchers("/internal/v1/shows/**").permitAll()
+                        .requestMatchers("/internal/v1/shows/**").hasAnyRole("SERVICE", "ADMIN")
                         .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 )

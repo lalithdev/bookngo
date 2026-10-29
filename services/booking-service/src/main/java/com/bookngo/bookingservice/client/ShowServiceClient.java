@@ -20,7 +20,7 @@ public class ShowServiceClient {
 
     private final ShowFeignClient showFeignClient;
     private final JwtService jwtService;
-    private static final UUID SYSTEM_INTERNAL_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID SERVICE_CALLER_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000005");
 
     public ShowServiceClient(
             ShowFeignClient showFeignClient,
@@ -63,7 +63,7 @@ public class ShowServiceClient {
         }
 
         try {
-            String token = jwtService.generateToken(SYSTEM_INTERNAL_USER_ID, List.of("ADMIN"));
+            String token = jwtService.generateToken(SERVICE_CALLER_USER_ID, List.of("SERVICE"));
             CancellationPolicyDto policy = showFeignClient.getCancellationPolicy("Bearer " + token, showId);
             return Optional.ofNullable(policy);
         } catch (Exception e) {

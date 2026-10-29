@@ -66,17 +66,6 @@ public class OperatorAuthorizationService {
             if (tokenAssignedTheatres != null && tokenAssignedTheatres.contains(theatreId.toString())) {
                 return;
             }
-
-            // Check header if present
-            String headerAssigned = request.getHeader("X-Operator-Assigned-Theatres");
-            if (headerAssigned != null) {
-                String[] theatres = headerAssigned.split(",");
-                for (String t : theatres) {
-                    if (theatreId.toString().equalsIgnoreCase(t.trim())) {
-                        return;
-                    }
-                }
-            }
         }
 
         throw new AccessDeniedException("Theatre operator is not assigned to this theatre");

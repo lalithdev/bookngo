@@ -83,7 +83,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/v1/shows/*/seat-inventory").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/internal/v1/bookings/**").authenticated()
+                        .requestMatchers("/internal/v1/bookings/**").hasAnyRole("SERVICE", "ADMIN")
                         .requestMatchers("/api/v1/holds/**").authenticated()
                         .requestMatchers("/api/v1/shows/*/holds").authenticated()
                         .requestMatchers("/api/v1/bookings/**").authenticated()

@@ -22,9 +22,20 @@ public class JwtService {
     private final long expirationSeconds;
 
     public JwtService(
-            @Value("${app.jwt.secret:${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}}") String secret,
+            @Value("${app.jwt.secret:${jwt.secret:}}") String secret,
             @Value("${app.jwt.expiration-ms:${jwt.expiration-ms:86400000}}") long expirationMs) {
-        this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        if (secret == null || secret.trim().isEmpty()) {
+            throw new IllegalStateException("JWT signing secret key must be configured via 'app.jwt.secret' or 'jwt.secret' (or JWT_SECRET) and cannot be blank.");
+        }
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT signing secret key length (" + keyBytes.length + " bytes) is too short. At least 32 bytes (256 bits) are required for HMAC-SHA256.");
+        }
+        try {
+            this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to initialize JWT signing key: " + e.getMessage(), e);
+        }
         this.expirationSeconds = expirationMs / 1000;
     }
 

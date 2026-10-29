@@ -49,4 +49,25 @@ class JwtServiceTest {
         String token = expiredJwtService.generateToken(userId, List.of("ADMIN"));
         assertFalse(jwtService.validateToken(token));
     }
+
+    @Test
+    void testMissingOrBlankSecretThrowsException() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> new JwtService(null, EXPIRATION_MS));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> new JwtService("", EXPIRATION_MS));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> new JwtService("   ", EXPIRATION_MS));
+    }
+
+    @Test
+    void testShortSecretThrowsException() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> new JwtService("short-key-under-32-bytes", EXPIRATION_MS));
+    }
+
+    @Test
+    void testTokenSignedWithDifferentKeyFailsValidation() {
+        String differentSecret = "AnotherSecretKeyForTestingPurposesOnlyMustBeAtLeast32BytesLong!";
+        JwtService otherJwtService = new JwtService(differentSecret, EXPIRATION_MS);
+        String token = otherJwtService.generateToken(UUID.randomUUID(), List.of("CUSTOMER"));
+
+        assertFalse(jwtService.validateToken(token));
+    }
 }

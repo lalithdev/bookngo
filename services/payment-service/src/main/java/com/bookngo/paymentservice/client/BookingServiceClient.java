@@ -36,7 +36,7 @@ public class BookingServiceClient {
      * The same system internal user ID as used in Booking Service's PaymentServiceClient.
      * This UUID is the agreed-upon sentinel for internal service-to-service calls.
      */
-    private static final UUID SYSTEM_INTERNAL_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID SERVICE_CALLER_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000006");
 
     private final BookingFeignClient bookingFeignClient;
     private final JwtService jwtService;
@@ -57,7 +57,7 @@ public class BookingServiceClient {
      * @return authoritative booking details including amount and currency
      */
     public ApplyPaymentPendingResponse applyPaymentPending(UUID bookingId, UUID userId) {
-        String token = jwtService.generateToken(SYSTEM_INTERNAL_USER_ID, List.of("ADMIN"));
+        String token = jwtService.generateToken(SERVICE_CALLER_USER_ID, List.of("SERVICE"));
         ApplyPaymentPendingRequest request = ApplyPaymentPendingRequest.builder()
                 .userId(userId)
                 .build();
@@ -95,7 +95,7 @@ public class BookingServiceClient {
      * @param outcome   SUCCESS | FAILURE | CANCELLED | UNKNOWN
      */
     public void notifyPaymentOutcome(UUID bookingId, UUID paymentId, String outcome) {
-        String token = jwtService.generateToken(SYSTEM_INTERNAL_USER_ID, List.of("ADMIN"));
+        String token = jwtService.generateToken(SERVICE_CALLER_USER_ID, List.of("SERVICE"));
         PaymentOutcomeRequest request = PaymentOutcomeRequest.builder()
                 .paymentId(paymentId)
                 .outcome(outcome)
